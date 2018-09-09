@@ -111,6 +111,9 @@ venv.bak/
 .floydignore
 floyd.yml
 
+# tensorboardX
+runs
+
 # code2vec
 output/code.vec
 output/code2vec.model
