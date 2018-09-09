@@ -1,0 +1,27 @@
+
+# Directories and files to ignore when uploading code to floyd
+
+.git
+.eggs
+eggs
+lib
+lib64
+parts
+sdist
+var
+*.pyc
+*.swp
+.DS_Store
+
+.gitattributes
+.gitignore
+
+# PyCharm
+.idea
+
+# code2vec
+dataset
+datasets
+output
+raw_data
+runs

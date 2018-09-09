@@ -108,7 +108,6 @@ venv.bak/
 
 # FloydHub
 .floydexpt
-.floydignore
 floyd.yml
 
 # tensorboardX
