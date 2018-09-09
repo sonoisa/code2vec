@@ -259,7 +259,7 @@ def print_sample(reader, model, data_loader, option):
                     attentions = attn.cpu()[i]
 
                     for start, path, end, attention in zip(start_names, path_names, end_names, attentions):
-                        if start > 0:
+                        if start != "<PAD/>":
                             logger.info("{0} {1} {2} [{3}]".format(start, path, end, attention))
                     logger.info('expected label: {0}'.format(label_name))
                     logger.info('actual label:   {0}'.format(pred_label_name))
