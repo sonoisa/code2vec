@@ -32,9 +32,9 @@ logger.addHandler(console)
 parser = argparse.ArgumentParser()
 parser.add_argument('--random_seed', type=int, default=123, help="random_seed")
 
-parser.add_argument('--corpus_path', type=str, default="./datasets/dataset/corpus.txt", help="corpus_path")
-parser.add_argument('--path_idx_path', type=str, default="./datasets/dataset/path_idxs.txt", help="path_idx_path")
-parser.add_argument('--terminal_idx_path', type=str, default="./datasets/dataset/terminal_idxs.txt", help="terminal_idx_path")
+parser.add_argument('--corpus_path', type=str, default="./dataset/corpus.txt", help="corpus_path")
+parser.add_argument('--path_idx_path', type=str, default="./dataset/path_idxs.txt", help="path_idx_path")
+parser.add_argument('--terminal_idx_path', type=str, default="./dataset/terminal_idxs.txt", help="terminal_idx_path")
 
 parser.add_argument('--batch_size', type=int, default=32, help="batch_size")
 parser.add_argument('--terminal_embed_size', type=int, default=100, help="terminal_embed_size")
