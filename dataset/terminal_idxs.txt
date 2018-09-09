@@ -25,6 +25,7 @@
 24	length
 25	1
 26	runtimeexception
+27	@string_literal
 28	fileimageinputstream
 29	0
 30	classdumper
