@@ -244,7 +244,7 @@ def print_sample(reader, model, data_loader, option):
             starts = sample_batched['starts'].to(option.device)
             paths = sample_batched['paths'].to(option.device)
             ends = sample_batched['ends'].to(option.device)
-            label = sample_batched['label']
+            label = sample_batched['label'].to(option.device)
 
             preds, code_vector, attn = model.forward(starts, paths, ends)
             _, preds_label = torch.max(preds, dim=1)
@@ -282,7 +282,7 @@ def write_code_vectors(reader, model, data_loader, option, vector_file, mode, te
                 starts = sample_batched['starts'].to(option.device)
                 paths = sample_batched['paths'].to(option.device)
                 ends = sample_batched['ends'].to(option.device)
-                label = sample_batched['label']
+                label = sample_batched['label'].to(option.device)
 
                 preds, code_vector, _ = model.forward(starts, paths, ends)
                 preds_prob, preds_label = torch.max(preds, dim=1)
