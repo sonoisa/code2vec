@@ -44,6 +44,7 @@ parser.add_argument('--max_path_length', type=int, default=200, help="max_path_l
 
 parser.add_argument('--model_path', type=str, default="./output", help="model_path")
 parser.add_argument('--vectors_path', type=str, default="./output/code.vec", help="vectors_path")
+parser.add_argument('--test_result_path', type=str, default=None, help="test_result_path")
 
 parser.add_argument("--max_epoch", type=int, default=160, help="max_epoch")
 parser.add_argument('--lr', type=float, default=0.01, help="lr")
@@ -184,8 +185,8 @@ def train():
                 vector_file = args.vectors_path
                 with open(vector_file, "w") as f:
                     f.write("{0}\t{1}\n".format(len(reader.items), option.encode_size))
-                write_code_vectors(reader, model, train_data_loader, option, vector_file, "a")
-                write_code_vectors(reader, model, test_data_loader, option, vector_file, "a")
+                write_code_vectors(reader, model, train_data_loader, option, vector_file, "a", None)
+                write_code_vectors(reader, model, test_data_loader, option, vector_file, "a", args.test_result_path)
                 torch.save(model.state_dict(), path.join(args.model_path, "code2vec.model"))
 
             if last_loss is None or train_loss < last_loss or last_accuracy is None or last_accuracy < accuracy:
@@ -243,7 +244,7 @@ def print_sample(reader, model, data_loader, option):
             starts = sample_batched['starts'].to(option.device)
             paths = sample_batched['paths'].to(option.device)
             ends = sample_batched['ends'].to(option.device)
-            label = sample_batched['label'].to(device)
+            label = sample_batched['label']
 
             preds, code_vector, attn = model.forward(starts, paths, ends)
             _, preds_label = torch.max(preds, dim=1)
@@ -266,24 +267,37 @@ def print_sample(reader, model, data_loader, option):
                     return
 
 
-def write_code_vectors(reader, model, data_loader, option, vector_file, mode):
+def write_code_vectors(reader, model, data_loader, option, vector_file, mode, test_result_file):
     """ファイルにコードベクトルを出力する。"""
-
+    model.eval()
     with torch.no_grad():
-        with open(vector_file, mode) as f:
+        if test_result_file is not None:
+            fr = open(test_result_file, "w")
+        else:
+            fr = None
+
+        with open(vector_file, mode) as fv:
             for i_batch, sample_batched in enumerate(data_loader):
+                id = sample_batched['id']
                 starts = sample_batched['starts'].to(option.device)
                 paths = sample_batched['paths'].to(option.device)
                 ends = sample_batched['ends'].to(option.device)
-                label = sample_batched['label'].to(option.device)
+                label = sample_batched['label']
 
-                _, code_vector, _ = model.forward(starts, paths, ends)
+                preds, code_vector, _ = model.forward(starts, paths, ends)
+                preds_prob, preds_label = torch.max(preds, dim=1)
 
                 for i in range(len(starts)):
                     label_name = reader.label_vocab.itos[label[i].item()]
                     vec = code_vector.cpu()[i]
-                    f.write(label_name + "\t" + " ".join([str(e.item()) for e in vec]) + "\n")
+                    fv.write(label_name + "\t" + " ".join([str(e.item()) for e in vec]) + "\n")
 
+                    if test_result_file is not None:
+                        pred_name = reader.label_vocab.itos[preds_label[i].item()]
+                        fr.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(id[i].item(), label_name == pred_name, label_name, pred_name, preds_prob[i].item()))
+
+        if test_result_file is not None:
+            fr.close()
 
 def main():
     train()

@@ -118,3 +118,4 @@ output/code.vec
 output/code2vec.model
 raw_data
 datasets
+output/test_result.txt

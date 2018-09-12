@@ -25,7 +25,7 @@ class CodeDataset(Dataset):
 
     def __getitem__(self, index):
         item = {
-            'ids': self.ids[index],
+            'id': self.ids[index],
             'starts': self.starts[index],
             'paths': self.paths[index],
             'ends': self.ends[index],
