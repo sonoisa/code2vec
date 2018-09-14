@@ -53,13 +53,24 @@ class Vocab(object):
     def __init__(self):
         self.stoi = {}
         self.itos = {}
+        self.freq = {}
 
     def append(self, name, index=None):
         if name not in self.stoi:
             if index is None:
                 index = len(self.stoi)
+            if self.freq.get(index) is None:
+                self.freq[index] = 0
             self.stoi[name] = index
             self.itos[index] = name
+            self.freq[index] += 1
+
+    def get_freq_list(self):
+        freq = self.freq
+        freq_list = [0] * self.len()
+        for i in range(self.len()):
+            freq_list[i] = freq[i]
+        return freq_list
 
     def len(self):
         return len(self.stoi)

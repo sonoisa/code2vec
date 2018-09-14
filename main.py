@@ -98,6 +98,8 @@ def train():
     reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path)
     option = Option(reader)
 
+    label_freq = torch.tensor(reader.label_vocab.get_freq_list(), dtype=torch.float32).to(device)
+
     model = Code2Vec(option).to(device)
     # print(model)
     # for param in model.parameters():
@@ -106,7 +108,7 @@ def train():
     builder = DatasetBuilder(reader, option)
 
     learning_rate = args.lr
-    criterion = nn.NLLLoss()
+    criterion = nn.NLLLoss(weight=1 / label_freq).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(args.beta_min, args.beta_max), weight_decay=args.weight_decay)
 
     best_f1 = None
