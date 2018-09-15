@@ -24,4 +24,6 @@ dataset
 datasets
 output
 raw_data
+requirements.txt
 runs
+visualize_code_vec.py
