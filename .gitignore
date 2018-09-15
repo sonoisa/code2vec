@@ -103,6 +103,9 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# Mac
+.DS_Store
+
 # PyCharm
 .idea
 
@@ -114,8 +117,6 @@ floyd.yml
 runs
 
 # code2vec
-output/code.vec
-output/code2vec.model
+output/*
 raw_data
 datasets
-output/test_result.txt
