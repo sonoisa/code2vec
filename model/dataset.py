@@ -5,6 +5,7 @@ __copyright__ = "Copyright (C) 2018 Isao Sonobe"
 
 from torch.utils.data import Dataset
 
+import re
 import logging
 logger = logging.getLogger()
 
@@ -42,9 +43,13 @@ class CodeData(object):
     def __init__(self):
         self.id = None
         self.label = None
+        self.normalized_label = None
         self.path_contexts = []
         self.source = None
         self.aliases = {}
+
+
+REDUNDANT_SYMBOL_CHARS = re.compile(r"[_0-9]+")
 
 
 class Vocab(object):
@@ -74,3 +79,7 @@ class Vocab(object):
 
     def len(self):
         return len(self.stoi)
+
+    @staticmethod
+    def normalize_method_name(method_name):
+        return REDUNDANT_SYMBOL_CHARS.sub("", method_name).lower()

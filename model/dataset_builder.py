@@ -49,7 +49,7 @@ class DatasetBuilder(object):
         label_vocab_stoi = reader.label_vocab.stoi
         for item in items:
             inputs_id.append(item.id)
-            label_index = label_vocab_stoi[item.label]
+            label_index = label_vocab_stoi[item.normalized_label]
             inputs_label.append(label_index)
             starts = []
             paths = []

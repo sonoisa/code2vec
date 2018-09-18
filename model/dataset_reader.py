@@ -72,7 +72,9 @@ class DatasetReader(object):
                 elif line.startswith('label:'):
                     label = line[6:]
                     code_data.label = label
-                    label_vocab_append(label)
+                    normalized_label = Vocab.normalize_method_name(label)
+                    code_data.normalized_label = normalized_label
+                    label_vocab_append(normalized_label)
                 elif line.startswith('class:'):
                     code_data.source = line[6:]
                 elif line.startswith('paths:'):
