@@ -59,7 +59,8 @@ parser.add_argument("--gpu", type=str, default="cuda:0", help="gpu")
 parser.add_argument("--num_workers", type=int, default=4, help="num_workers")
 
 parser.add_argument("--env", type=str, default=None, help="env")
-parser.add_argument("--print_sample_cycle", type=int, default=40, help="print_sample_cycle")
+parser.add_argument("--print_sample_cycle", type=int, default=10, help="print_sample_cycle")
+parser.add_argument("--eval_method", type=str, default="subtoken", help="eval_method")
 
 args = parser.parse_args()
 
@@ -146,7 +147,7 @@ def train():
 
             builder.refresh_test_dataset()
             test_data_loader = DataLoader(builder.test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-            test_loss, accuracy, precision, recall, f1 = test(model, test_data_loader, criterion, option)
+            test_loss, accuracy, precision, recall, f1 = test(model, test_data_loader, criterion, option, reader.label_vocab)
 
             if args.env == "floyd":
                 print("epoch {0}".format(epoch))
@@ -207,7 +208,7 @@ def train():
             summary_writer.close()
 
 
-def test(model, data_loader, criterion, option):
+def test(model, data_loader, criterion, option, label_vocab):
     """学習したモデルの精度をテストデータで評価する"""
     model.eval()
     with torch.no_grad():
@@ -231,11 +232,76 @@ def test(model, data_loader, criterion, option):
 
         expected_labels = np.array(expected_labels)
         actual_labels = np.array(actual_labels)
-        precision = precision_score(expected_labels, actual_labels, average='weighted')
-        recall = recall_score(expected_labels, actual_labels, average='weighted')
-        f1 = f1_score(expected_labels, actual_labels, average='weighted')
-        accuracy = accuracy_score(expected_labels, actual_labels)
+        accuracy, precision, recall, f1 = None, None, None, None
+        if args.eval_method == 'exact':
+            accuracy ,precision, recall, f1 = exact_match(expected_labels, actual_labels)
+        elif args.eval_method == 'subtoken':
+            accuracy, precision, recall, f1 = subtoken_match(expected_labels, actual_labels, label_vocab)
+        elif args.eval_method == 'ave_subtoken':
+            accuracy, precision, recall, f1 = averaged_subtoken_match(expected_labels, actual_labels, label_vocab)
         return test_loss, accuracy, precision, recall, f1
+
+
+def exact_match(expected_labels, actual_labels):
+    precision = precision_score(expected_labels, actual_labels, average='weighted')
+    recall = recall_score(expected_labels, actual_labels, average='weighted')
+    f1 = f1_score(expected_labels, actual_labels, average='weighted')
+    accuracy = accuracy_score(expected_labels, actual_labels)
+    return accuracy, precision, recall, f1
+
+
+def averaged_subtoken_match(expected_labels, actual_labels, label_vocab):
+    subtokens_accuracy = []
+    subtokens_precision = []
+    subtokens_recall = []
+    subtokens_f1 = []
+    for expected, actual in zip(expected_labels.tolist(), actual_labels.tolist()):
+        exp_subtokens = label_vocab.itosubtokens[expected]
+        actual_subtokens = label_vocab.itosubtokens[actual]
+        match = 0
+        for subtoken in exp_subtokens:
+            if subtoken in actual_subtokens:
+                match += 1
+        acc = match / float(len(exp_subtokens) + len(actual_subtokens) - match)
+        rec = match / float(len(exp_subtokens))
+        prec = match / float(len(actual_subtokens))
+        if prec + rec > 0:
+            subtoken_f1 = 2.0 * prec * rec / (prec + rec)
+        else:
+            subtoken_f1 = 0.0
+        subtokens_accuracy.append(acc)
+        subtokens_precision.append(prec)
+        subtokens_recall.append(rec)
+        subtokens_f1.append(subtoken_f1)
+
+    ave_accuracy = np.average(subtokens_accuracy)
+    ave_precision = np.average(subtokens_precision)
+    ave_recall = np.average(subtokens_recall)
+    ave_f1 = np.average(subtokens_f1)
+    return ave_accuracy, ave_precision, ave_recall, ave_f1
+
+
+def subtoken_match(expected_labels, actual_labels, label_vocab):
+    subtokens_match = 0.0
+    subtokens_expected_count = 0.0
+    subtokens_actual_count = 0.0
+    for expected, actual in zip(expected_labels.tolist(), actual_labels.tolist()):
+        exp_subtokens = label_vocab.itosubtokens[expected]
+        actual_subtokens = label_vocab.itosubtokens[actual]
+        for subtoken in exp_subtokens:
+            if subtoken in actual_subtokens:
+                subtokens_match += 1
+        subtokens_expected_count += len(exp_subtokens)
+        subtokens_actual_count += len(actual_subtokens)
+
+    accuracy = subtokens_match / (subtokens_expected_count + subtokens_actual_count - subtokens_match)
+    precision = subtokens_match / subtokens_actual_count
+    recall = subtokens_match / subtokens_expected_count
+    if precision + recall > 0:
+        f1 = 2.0 * precision * recall / (precision + recall)
+    else:
+        f1 = 0.0
+    return accuracy, precision, recall, f1
 
 
 def print_sample(reader, model, data_loader, option):

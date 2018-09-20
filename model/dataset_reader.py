@@ -17,7 +17,7 @@ class VocabReader(object):
 
     def read(self):
         vocab = Vocab()
-        with open(self.filename, mode="r") as f:
+        with open(self.filename, mode="r", encoding="utf-8") as f:
             lines = f.readlines()
             for line in lines:
                 data = line.strip(' \r\n\t').split('\t')
@@ -48,7 +48,7 @@ class DatasetReader(object):
         logger.info('corpus: {0}'.format(len(self.items)))
 
     def load(self, corpus_path):
-        with open(corpus_path, mode="r") as f:
+        with open(corpus_path, mode="r", encoding="utf-8") as f:
             code_data = None
             path_contexts_append = None
             parse_mode = 0
@@ -73,14 +73,18 @@ class DatasetReader(object):
                     label = line[6:]
                     code_data.label = label
                     normalized_label = Vocab.normalize_method_name(label)
-                    code_data.normalized_label = normalized_label
-                    label_vocab_append(normalized_label)
+                    subtokens = Vocab.get_method_subtokens(normalized_label)
+                    normalized_lower_label = normalized_label.lower()
+                    code_data.normalized_label = normalized_lower_label
+                    label_vocab_append(normalized_lower_label, subtokens=subtokens)
                 elif line.startswith('class:'):
                     code_data.source = line[6:]
                 elif line.startswith('paths:'):
                     parse_mode = 1
                 elif line.startswith('vars:'):
                     parse_mode = 2
+                elif line.startswith('doc:'):
+                    doc = line[4:]
                 elif parse_mode == 1:
                     path_context = line.split('\t')
                     path_contexts_append((int(path_context[0]), int(path_context[1]), int(path_context[2])))

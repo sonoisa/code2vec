@@ -49,18 +49,19 @@ class CodeData(object):
         self.aliases = {}
 
 
-REDUNDANT_SYMBOL_CHARS = re.compile(r"[_0-9]+")
-
-
 class Vocab(object):
     """終端記号やパス、ラベルの語彙"""
+
+    REDUNDANT_SYMBOL_CHARS = re.compile(r"[_0-9]+")
+    METHOD_SUBTOKEN_SEPARATOR = re.compile(r"([a-z]+)([A-Z][a-z]+)|([A-Z][a-z]+)")
 
     def __init__(self):
         self.stoi = {}
         self.itos = {}
+        self.itosubtokens = {}
         self.freq = {}
 
-    def append(self, name, index=None):
+    def append(self, name, index=None, subtokens=None):
         if name not in self.stoi:
             if index is None:
                 index = len(self.stoi)
@@ -68,6 +69,8 @@ class Vocab(object):
                 self.freq[index] = 0
             self.stoi[name] = index
             self.itos[index] = name
+            if subtokens is not None:
+                self.itosubtokens[index] = subtokens
             self.freq[index] += 1
 
     def get_freq_list(self):
@@ -82,4 +85,8 @@ class Vocab(object):
 
     @staticmethod
     def normalize_method_name(method_name):
-        return REDUNDANT_SYMBOL_CHARS.sub("", method_name).lower()
+        return Vocab.REDUNDANT_SYMBOL_CHARS.sub("", method_name)
+
+    @staticmethod
+    def get_method_subtokens(method_name):
+        return [x.lower() for x in Vocab.METHOD_SUBTOKEN_SEPARATOR.split(method_name) if x is not None and x != '']
