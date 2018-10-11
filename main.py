@@ -73,7 +73,7 @@ if args.env == "tensorboard":
 
 
 class Option(object):
-    """学習モデルの設定項目"""
+    """configurations of the model"""
 
     def __init__(self, reader):
         self.max_path_length = args.max_path_length
@@ -92,7 +92,7 @@ class Option(object):
 
 
 def train():
-    """学習する。"""
+    """train the model"""
 
     torch.manual_seed(args.random_seed)
 
@@ -138,8 +138,7 @@ def train():
 
                 optimizer.zero_grad()
                 preds, _, _ = model.forward(starts, paths, ends)
-                preds = F.log_softmax(preds, dim=1)
-                loss = criterion(preds, label)
+                loss = calculate_loss(preds, label, criterion, option)
                 loss.backward()
                 optimizer.step()
 
@@ -208,8 +207,24 @@ def train():
             summary_writer.close()
 
 
+def calculate_loss(predictions, label, criterion, option):
+    # preds = F.log_softmax(predictions, dim=1)
+    #
+    # batch_size = predictions.size()[0]
+    # y_onehot = torch.FloatTensor(batch_size, option.label_count).to(device)
+    # y_onehot.zero_()
+    # y_onehot.scatter_(1, label.view(-1, 1), 1)
+    #
+    # loss = -torch.mean(torch.sum(preds * y_onehot, dim=1))
+
+    preds = F.log_softmax(predictions, dim=1)
+    loss = criterion(preds, label)
+
+    return loss
+
+
 def test(model, data_loader, criterion, option, label_vocab):
-    """学習したモデルの精度をテストデータで評価する"""
+    """test the model"""
     model.eval()
     with torch.no_grad():
         test_loss = 0.0
@@ -224,8 +239,7 @@ def test(model, data_loader, criterion, option, label_vocab):
             expected_labels.extend(label)
 
             preds, _, _ = model.forward(starts, paths, ends)
-            preds = F.log_softmax(preds, dim=1)
-            loss = criterion(preds, label)
+            loss = calculate_loss(preds, label, criterion, option)
             test_loss += loss.item()
             _, preds_label = torch.max(preds, dim=1)
             actual_labels.extend(preds_label)
@@ -305,7 +319,7 @@ def subtoken_match(expected_labels, actual_labels, label_vocab):
 
 
 def print_sample(reader, model, data_loader, option):
-    """学習したモデルを用いて、予測と正解が一致したデータを1つだけ表示する。"""
+    """print one data that leads correct prediction with the trained model"""
     model.eval()
     with torch.no_grad():
         for i_batch, sample_batched in enumerate(data_loader):
@@ -336,7 +350,7 @@ def print_sample(reader, model, data_loader, option):
 
 
 def write_code_vectors(reader, model, data_loader, option, vector_file, mode, test_result_file):
-    """ファイルにコードベクトルを出力する。"""
+    """sav the code vectors"""
     model.eval()
     with torch.no_grad():
         if test_result_file is not None:

@@ -13,7 +13,7 @@ NINF = - 3.4 * math.pow(10, 38)  # -Inf
 
 
 class Code2Vec(nn.Module):
-    """code2vecモデル"""
+    """the code2vec model"""
 
     def __init__(self, option):
         super(Code2Vec, self).__init__()
@@ -68,7 +68,7 @@ class Code2Vec(nn.Module):
         return outputs, code_vector, attention
 
     def get_attention(self, vectors, mask):
-        """vectorsはpaddingされている可能性があるため、maskが1である値のみを使いattentionを計算する。"""
+        """calculate the attention of the (masked) context vetors. mask=1: meaningful value, mask=0: padded."""
         expanded_attn_param = self.attention_parameter.unsqueeze(0).expand_as(vectors)
         attn_ca = torch.mul(torch.sum(vectors * expanded_attn_param, dim=2), mask) + (1 - mask) * NINF
         # attn_ca = torch.sum(vectors * expanded_attn_param, dim=2)

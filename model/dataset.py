@@ -11,7 +11,7 @@ logger = logging.getLogger()
 
 
 class CodeDataset(Dataset):
-    """データセット（学習やテストの入力になるデータ）"""
+    """dataset for training/test"""
 
     def __init__(self, ids, starts, paths, ends, labels, transform=None):
         self.ids = ids
@@ -38,7 +38,7 @@ class CodeDataset(Dataset):
 
 
 class CodeData(object):
-    """1つのメソッドに対応するデータ"""
+    """data corresponding to one method"""
 
     def __init__(self):
         self.id = None
@@ -50,7 +50,7 @@ class CodeData(object):
 
 
 class Vocab(object):
-    """終端記号やパス、ラベルの語彙"""
+    """vocabulary (terminal symbols or path names or label(method names))"""
 
     REDUNDANT_SYMBOL_CHARS = re.compile(r"[_0-9]+")
     METHOD_SUBTOKEN_SEPARATOR = re.compile(r"([a-z]+)([A-Z][a-z]+)|([A-Z][a-z]+)")

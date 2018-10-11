@@ -10,7 +10,7 @@ logger = logging.getLogger()
 
 
 class VocabReader(object):
-    """語彙をファイルから読み込む"""
+    """read vocabulary file"""
 
     def __init__(self, filename):
         self.filename = filename
@@ -31,7 +31,7 @@ class VocabReader(object):
 
 
 class DatasetReader(object):
-    """データセットをファイルから読み込む"""
+    """read dataset file"""
 
     def __init__(self, corpus_path, path_index_path, terminal_index_path):
         self.path_vocab = VocabReader(path_index_path).read()

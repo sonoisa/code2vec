@@ -14,7 +14,7 @@ logger = logging.getLogger()
 
 
 class DatasetBuilder(object):
-    """学習用・テスト用にデータセットを整形する"""
+    """transform dataset for training and test"""
 
     def __init__(self, reader, option, split_ratio=0.2):
         self.reader = reader
@@ -31,12 +31,12 @@ class DatasetBuilder(object):
         self.test_items = test_items
 
     def refresh_train_dataset(self):
-        """学習データを再整形する（path contextsをシャッフルし、max_path_lengthの長さに揃える）"""
+        """refresh training dataset (shuffling path contexts and picking up items (#items <= max_path_length)"""
         inputs_id, inputs_starts, inputs_paths, inputs_ends, inputs_label = self.build_data(self.reader, self.train_items, self.option.max_path_length)
         self.train_dataset = CodeDataset(inputs_id, inputs_starts, inputs_paths, inputs_ends, inputs_label)
 
     def refresh_test_dataset(self):
-        """テストデータを再整形する（path contextsをシャッフルし、max_path_lengthの長さに揃える）"""
+        """refresh test dataset (shuffling path contexts and picking up items (#items <= max_path_length)"""
         inputs_id, inputs_starts, inputs_paths, inputs_ends, inputs_label = self.build_data(self.reader, self.test_items, self.option.max_path_length)
         self.test_dataset = CodeDataset(inputs_id, inputs_starts, inputs_paths, inputs_ends, inputs_label)
 
@@ -73,7 +73,7 @@ class DatasetBuilder(object):
         return inputs_id, inputs_starts, inputs_paths, inputs_ends, inputs_label
 
     def pad_inputs(self, data, length, pad_value=0):
-        """dataの長さがlengthになるようにpad_valueを追加する"""
+        """pad values"""
 
         assert len(data) <= length
 
