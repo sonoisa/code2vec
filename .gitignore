@@ -120,3 +120,4 @@ runs
 output/*
 raw_data
 datasets
+top11_dataset/corpus.txt

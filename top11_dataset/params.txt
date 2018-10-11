@@ -1,0 +1,9 @@
+max_length: 8
+max_width: 3
+nomalize_string_literal: true
+nomalize_char_literal: true
+nomalize_int_literal: false
+nomalize_double_literal: false
+terminal_vocab_count: 360631
+path_vocab_count: 342845
+method_count: 605945
