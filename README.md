@@ -25,7 +25,7 @@ python main.py --lr 0.01 --corpus_path ./dataset/corpus.txt --path_idx_path ./da
 concatenate dataset:
 
 ```
-cat ./top11_dataset/splitted_corpus.* > ./top11_dataset/corpus.txt</code>
+cat ./top11_dataset/splitted_corpus.* > ./top11_dataset/corpus.txt
 ```
 
 train the model:
