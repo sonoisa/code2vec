@@ -8,19 +8,21 @@ __author__ = "Isao Sonobe"
 __copyright__ = "Copyright (C) 2018 Isao Sonobe"
 
 import sys
-sys.path.append('.')
+
+import argparse
+import numpy as np
+import torch
 
 from os import path
-import argparse
 
-
-import torch
 from torch.utils.data import DataLoader
 
-import numpy as np
 from model.model import *
 from model.dataset_builder import *
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+
+sys.path.append('.')
+
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -39,7 +41,7 @@ parser.add_argument('--terminal_idx_path', type=str, default="./dataset/terminal
 parser.add_argument('--batch_size', type=int, default=32, help="batch_size")
 parser.add_argument('--terminal_embed_size', type=int, default=100, help="terminal_embed_size")
 parser.add_argument('--path_embed_size', type=int, default=100, help="path_embed_size")
-parser.add_argument('--encode_size', type=int, default=100, help="encode_size")
+parser.add_argument('--encode_size', type=int, default=300, help="encode_size")
 parser.add_argument('--max_path_length', type=int, default=200, help="max_path_length")
 
 parser.add_argument('--model_path', type=str, default="./output", help="model_path")
@@ -62,6 +64,9 @@ parser.add_argument("--env", type=str, default=None, help="env")
 parser.add_argument("--print_sample_cycle", type=int, default=10, help="print_sample_cycle")
 parser.add_argument("--eval_method", type=str, default="subtoken", help="eval_method")
 
+parser.add_argument("--find_hyperparams", type=bool, default=False, help="find optimal hyperparameters")
+parser.add_argument("--num_trials", type=int, default=100, help="num_trials")
+
 args = parser.parse_args()
 
 device = torch.device(args.gpu if not args.no_cuda and torch.cuda.is_available() else "cpu")
@@ -71,6 +76,8 @@ logger.info("device: {0}".format(device))
 if args.env == "tensorboard":
     from tensorboardX import SummaryWriter
 
+if args.find_hyperparams:
+    import optuna
 
 class Option(object):
     """configurations of the model"""
@@ -87,31 +94,38 @@ class Option(object):
         self.encode_size = args.encode_size
 
         self.dropout_prob = args.dropout_prob
+        self.batch_size = args.batch_size
 
         self.device = device
 
 
 def train():
     """train the model"""
-
     torch.manual_seed(args.random_seed)
 
     reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path)
     option = Option(reader)
 
+    builder = DatasetBuilder(reader, option)
+
     label_freq = torch.tensor(reader.label_vocab.get_freq_list(), dtype=torch.float32).to(device)
+    criterion = nn.NLLLoss(weight=1 / label_freq).to(device)
 
     model = Code2Vec(option).to(device)
     # print(model)
     # for param in model.parameters():
     #     print(type(param.data), param.size())
 
-    builder = DatasetBuilder(reader, option)
-
     learning_rate = args.lr
-    criterion = nn.NLLLoss(weight=1 / label_freq).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(args.beta_min, args.beta_max), weight_decay=args.weight_decay)
 
+    _train(model, optimizer, criterion, option, reader, builder, None)
+
+
+def _train(model, optimizer, criterion, option, reader, builder, trial):
+    """train the model"""
+
+    f1 = 0.0
     best_f1 = None
     last_loss = None
     last_accuracy = None
@@ -127,7 +141,7 @@ def train():
             train_loss = 0.0
 
             builder.refresh_train_dataset()
-            train_data_loader = DataLoader(builder.train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+            train_data_loader = DataLoader(builder.train_dataset, batch_size=option.batch_size, shuffle=True, num_workers=args.num_workers)
 
             model.train()
             for i_batch, sample_batched in enumerate(train_data_loader):
@@ -145,7 +159,7 @@ def train():
                 train_loss += loss.item()
 
             builder.refresh_test_dataset()
-            test_data_loader = DataLoader(builder.test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+            test_data_loader = DataLoader(builder.test_dataset, batch_size=option.batch_size, shuffle=True, num_workers=args.num_workers)
             test_loss, accuracy, precision, recall, f1 = test(model, test_data_loader, criterion, option, reader.label_vocab)
 
             if args.env == "floyd":
@@ -172,7 +186,13 @@ def train():
                 summary_writer.add_scalar('metric/recall', recall, epoch)
                 summary_writer.add_scalar('metric/f1', f1, epoch)
 
-            if epoch > 1 and epoch % args.print_sample_cycle == 0:
+            if trial is not None:
+                intermediate_value = 1.0 - f1
+                trial.report(intermediate_value, epoch)
+                if trial.should_prune(epoch):
+                    raise optuna.structs.TrialPruned()
+
+            if epoch > 1 and epoch % args.print_sample_cycle == 0 and trial is None:
                 print_sample(reader, model, test_data_loader, option)
 
             if best_f1 is None or best_f1 < f1:
@@ -184,12 +204,13 @@ def train():
                     summary_writer.add_scalar('metric/best_f1', f1, epoch)
 
                 best_f1 = f1
-                vector_file = args.vectors_path
-                with open(vector_file, "w") as f:
-                    f.write("{0}\t{1}\n".format(len(reader.items), option.encode_size))
-                write_code_vectors(reader, model, train_data_loader, option, vector_file, "a", None)
-                write_code_vectors(reader, model, test_data_loader, option, vector_file, "a", args.test_result_path)
-                torch.save(model.state_dict(), path.join(args.model_path, "code2vec.model"))
+                if trial is None:
+                    vector_file = args.vectors_path
+                    with open(vector_file, "w") as f:
+                        f.write("{0}\t{1}\n".format(len(reader.items), option.encode_size))
+                    write_code_vectors(reader, model, train_data_loader, option, vector_file, "a", None)
+                    write_code_vectors(reader, model, test_data_loader, option, vector_file, "a", args.test_result_path)
+                    torch.save(model.state_dict(), path.join(args.model_path, "code2vec.model"))
 
             if last_loss is None or train_loss < last_loss or last_accuracy is None or last_accuracy < accuracy:
                 last_loss = train_loss
@@ -205,6 +226,8 @@ def train():
     finally:
         if args.env == "tensorboard":
             summary_writer.close()
+
+    return 1.0 - f1
 
 
 def calculate_loss(predictions, label, criterion, option):
@@ -381,8 +404,78 @@ def write_code_vectors(reader, model, data_loader, option, vector_file, mode, te
         if test_result_file is not None:
             fr.close()
 
+
+#
+# for optuna
+#
+def find_optimal_hyperparams():
+    """find optimal hyperparameters"""
+    torch.manual_seed(args.random_seed)
+
+    reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path)
+    option = Option(reader)
+
+    builder = DatasetBuilder(reader, option)
+
+    label_freq = torch.tensor(reader.label_vocab.get_freq_list(), dtype=torch.float32).to(device)
+    criterion = nn.NLLLoss(weight=1 / label_freq).to(device)
+
+    def objective(trial):
+        # option.max_path_length = int(trial.suggest_loguniform('max_path_length', 50, 200))
+        # option.terminal_embed_size = int(trial.suggest_loguniform('terminal_embed_size', 50, 200))
+        # option.path_embed_size = int(trial.suggest_loguniform('path_embed_size', 50, 200))
+        option.encode_size = int(trial.suggest_loguniform('encode_size', 100, 300))
+        option.dropout_prob = trial.suggest_loguniform('dropout_prob', 0.5, 0.9)
+        option.batch_size = int(trial.suggest_loguniform('batch_size', 256, 2048))
+
+        model = Code2Vec(option).to(device)
+        # print(model)
+        # for param in model.parameters():
+        #     print(type(param.data), param.size())
+
+        optimizer = get_optimizer(trial, model)
+
+        return _train(model, optimizer, criterion, option, reader, builder, trial)
+
+    study = optuna.create_study(pruner=optuna.pruners.MedianPruner())
+    study.optimize(objective, n_trials=args.num_trials)
+
+    best_params = study.best_params
+    best_value = study.best_value
+    if args.env == "floyd":
+        print('best hyperparams: {0}'.format(best_params))
+        print('best value: {0}'.format(best_value))
+    else:
+        logger.info("optimal hyperparams: {0}".format(best_params))
+        logger.info('best value: {0}'.format(best_value))
+
+
+def get_optimizer(trial, model):
+    # optimizer = trial.suggest_categorical('optimizer', [adam, momentum])
+    # weight_decay = trial.suggest_loguniform('weight_decay', 1e-10, 1e-3)
+    # return optimizer(model, trial, weight_decay)
+    weight_decay = trial.suggest_loguniform('weight_decay', 1e-10, 1e-3)
+    return adam(model, trial, weight_decay)
+
+
+def adam(model, trial, weight_decay):
+    lr = trial.suggest_loguniform('adam_lr', 1e-5, 1e-1)
+    return torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+
+def momentum(model, trial, weight_decay):
+    lr = trial.suggest_loguniform('momentum_sgd_lr', 1e-5, 1e-1)
+    return torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
+
+
+#
+# entry point
+#
 def main():
-    train()
+    if args.find_hyperparams:
+        find_optimal_hyperparams()
+    else:
+        train()
 
 
 if __name__ == '__main__':
