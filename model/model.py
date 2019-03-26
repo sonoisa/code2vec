@@ -29,10 +29,19 @@ class Code2Vec(nn.Module):
             self.input_dropout = None
 
         self.attention_parameter = Parameter(torch.nn.init.xavier_normal_(torch.zeros(option.encode_size, 1, dtype=torch.float32, requires_grad=True)).view(-1), requires_grad=True)
-        self.output_linear = nn.Linear(option.encode_size, option.label_count, bias=True)
-        self.output_linear.bias.data.fill_(0.0)
 
-    def forward(self, starts, paths, ends):
+        if option.angular_margin_loss:
+            self.output_linear = Parameter(torch.FloatTensor(option.label_count, option.encode_size))
+            nn.init.xavier_uniform_(self.output_linear)
+            self.cos_m = math.cos(option.angular_margin)
+            self.sin_m = math.sin(option.angular_margin)
+            self.th = math.cos(math.pi - option.angular_margin)
+            self.mm = math.sin(math.pi - option.angular_margin) * option.angular_margin
+        else:
+            self.output_linear = nn.Linear(option.encode_size, option.label_count, bias=True)
+            self.output_linear.bias.data.fill_(0.0)
+
+    def forward(self, starts, paths, ends, label):
         option = self.option
 
         # embedding
@@ -59,8 +68,19 @@ class Code2Vec(nn.Module):
         expanded_attn = attention.unsqueeze(-1).expand_as(combined_context_vectors)
         code_vector = torch.sum(torch.mul(combined_context_vectors, expanded_attn), dim=1)
 
-        # FNN
-        outputs = self.output_linear(code_vector)
+        if option.angular_margin_loss:
+            # angular margin loss
+            cosine = F.linear(F.normalize(code_vector), F.normalize(self.output_linear))
+            sine = torch.sqrt(1.0 - torch.pow(cosine, 2))
+            phi = cosine * self.cos_m - sine * self.sin_m
+            phi = torch.where(cosine > 0, phi, cosine)
+            one_hot = torch.zeros(cosine.size(), device=option.device)
+            one_hot.scatter_(1, label.view(-1, 1).long(), 1)
+            outputs = (one_hot * phi) + ((1.0 - one_hot) * cosine)
+            outputs *= option.inverse_temp
+        else:
+            # FNN
+            outputs = self.output_linear(code_vector)
 
         # if opt.training and opt.dropout_prob < 1.0:
         #     outputs = F.dropout(outputs, p=opt.dropout_prob, training=opt.training)

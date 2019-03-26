@@ -67,6 +67,11 @@ parser.add_argument("--eval_method", type=str, default="subtoken", help="eval_me
 parser.add_argument("--find_hyperparams", type=bool, default=False, help="find optimal hyperparameters")
 parser.add_argument("--num_trials", type=int, default=100, help="num_trials")
 
+parser.add_argument("--angular_margin_loss", type=bool, default=False, help="use angular margin loss")
+parser.add_argument("--angular_margin", type=float, default=0.5, help="angular margin")
+parser.add_argument("--inverse_temp", type=float, default=30.0, help="inverse temperature")
+
+
 args = parser.parse_args()
 
 device = torch.device(args.gpu if not args.no_cuda and torch.cuda.is_available() else "cpu")
@@ -95,6 +100,10 @@ class Option(object):
 
         self.dropout_prob = args.dropout_prob
         self.batch_size = args.batch_size
+
+        self.angular_margin_loss = args.angular_margin_loss
+        self.angular_margin = args.angular_margin
+        self.inverse_temp = args.inverse_temp
 
         self.device = device
 
@@ -151,7 +160,7 @@ def _train(model, optimizer, criterion, option, reader, builder, trial):
                 label = sample_batched['label'].to(device)
 
                 optimizer.zero_grad()
-                preds, _, _ = model.forward(starts, paths, ends)
+                preds, _, _ = model.forward(starts, paths, ends, label)
                 loss = calculate_loss(preds, label, criterion, option)
                 loss.backward()
                 optimizer.step()
@@ -261,7 +270,7 @@ def test(model, data_loader, criterion, option, label_vocab):
             label = sample_batched['label'].to(device)
             expected_labels.extend(label)
 
-            preds, _, _ = model.forward(starts, paths, ends)
+            preds, _, _ = model.forward(starts, paths, ends, label)
             loss = calculate_loss(preds, label, criterion, option)
             test_loss += loss.item()
             _, preds_label = torch.max(preds, dim=1)
@@ -351,7 +360,7 @@ def print_sample(reader, model, data_loader, option):
             ends = sample_batched['ends'].to(option.device)
             label = sample_batched['label'].to(option.device)
 
-            preds, code_vector, attn = model.forward(starts, paths, ends)
+            preds, code_vector, attn = model.forward(starts, paths, ends, label)
             _, preds_label = torch.max(preds, dim=1)
 
             for i in range(len(starts)):
@@ -389,7 +398,7 @@ def write_code_vectors(reader, model, data_loader, option, vector_file, mode, te
                 ends = sample_batched['ends'].to(option.device)
                 label = sample_batched['label'].to(option.device)
 
-                preds, code_vector, _ = model.forward(starts, paths, ends)
+                preds, code_vector, _ = model.forward(starts, paths, ends, label)
                 preds_prob, preds_label = torch.max(preds, dim=1)
 
                 for i in range(len(starts)):
