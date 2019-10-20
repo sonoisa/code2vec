@@ -47,25 +47,73 @@ class DatasetBuilder(object):
         inputs_ends = []
         inputs_label = []
         label_vocab_stoi = reader.label_vocab.stoi
-        for item in items:
-            inputs_id.append(item.id)
-            label_index = label_vocab_stoi[item.normalized_label]
-            inputs_label.append(label_index)
-            starts = []
-            paths = []
-            ends = []
+        question_token_index = reader.QUESTION_TOKEN_INDEX
 
-            random.shuffle(item.path_contexts)
-            for start, path, end in item.path_contexts[:max_path_length]:
-                starts.append(start)
-                paths.append(path)
-                ends.append(end)
-            starts = self.pad_inputs(starts, max_path_length)
-            paths = self.pad_inputs(paths, max_path_length)
-            ends = self.pad_inputs(ends, max_path_length)
-            inputs_starts.append(starts)
-            inputs_paths.append(paths)
-            inputs_ends.append(ends)
+        if self.reader.infer_method:
+            # replace @method_0 with @question
+            method_token_index = reader.terminal_vocab.stoi["@method_0"]
+
+            for item in items:
+                inputs_id.append(item.id)
+                label_index = label_vocab_stoi[item.normalized_label]
+                inputs_label.append(label_index)
+                starts = []
+                paths = []
+                ends = []
+
+                random.shuffle(item.path_contexts)
+                for start, path, end in item.path_contexts[:max_path_length]:
+                    if start == method_token_index:
+                        start = question_token_index
+                    starts.append(start)
+
+                    paths.append(path)
+
+                    if end == method_token_index:
+                        end = question_token_index
+                    ends.append(end)
+                starts = self.pad_inputs(starts, max_path_length)
+                paths = self.pad_inputs(paths, max_path_length)
+                ends = self.pad_inputs(ends, max_path_length)
+                inputs_starts.append(starts)
+                inputs_paths.append(paths)
+                inputs_ends.append(ends)
+
+        if self.reader.infer_variable:
+            # replace @var_XX with @question
+            for item in items:
+
+                for alias_name in item.aliases:
+                    if not alias_name.startswith("@var_"):
+                        continue
+                    var_token_index = reader.terminal_vocab.stoi[alias_name]
+                    normalized_var_name = item.aliases[alias_name]
+                    label_index = label_vocab_stoi[normalized_var_name]
+
+                    inputs_id.append(item.id)
+                    inputs_label.append(label_index)
+                    starts = []
+                    paths = []
+                    ends = []
+
+                    random.shuffle(item.path_contexts)
+                    for start, path, end in item.path_contexts[:max_path_length]:
+                        if start == var_token_index:
+                            start = question_token_index
+                        starts.append(start)
+
+                        paths.append(path)
+
+                        if end == var_token_index:
+                            end = question_token_index
+                        ends.append(end)
+                    starts = self.pad_inputs(starts, max_path_length)
+                    paths = self.pad_inputs(paths, max_path_length)
+                    ends = self.pad_inputs(ends, max_path_length)
+                    inputs_starts.append(starts)
+                    inputs_paths.append(paths)
+                    inputs_ends.append(ends)
+
         inputs_starts = torch.tensor(inputs_starts, dtype=torch.long)
         inputs_paths = torch.tensor(inputs_paths, dtype=torch.long)
         inputs_ends = torch.tensor(inputs_ends, dtype=torch.long)

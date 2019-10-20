@@ -15,6 +15,8 @@ import torch
 
 from os import path
 
+from distutils.util import strtobool
+
 from torch.utils.data import DataLoader
 
 from model.model import *
@@ -56,7 +58,7 @@ parser.add_argument('--weight_decay', type=float, default=0.0, help="weight_deca
 
 parser.add_argument('--dropout_prob', type=float, default=0.25, help="dropout_prob")
 
-parser.add_argument("--no_cuda", type=bool, default=False, help="no_cuda")
+parser.add_argument("--no_cuda", action="store_true", default=False, help="no_cuda")
 parser.add_argument("--gpu", type=str, default="cuda:0", help="gpu")
 parser.add_argument("--num_workers", type=int, default=4, help="num_workers")
 
@@ -64,13 +66,15 @@ parser.add_argument("--env", type=str, default=None, help="env")
 parser.add_argument("--print_sample_cycle", type=int, default=10, help="print_sample_cycle")
 parser.add_argument("--eval_method", type=str, default="subtoken", help="eval_method")
 
-parser.add_argument("--find_hyperparams", type=bool, default=False, help="find optimal hyperparameters")
+parser.add_argument("--find_hyperparams", action="store_true", default=False, help="find optimal hyperparameters")
 parser.add_argument("--num_trials", type=int, default=100, help="num_trials")
 
-parser.add_argument("--angular_margin_loss", type=bool, default=False, help="use angular margin loss")
+parser.add_argument("--angular_margin_loss", action="store_true", default=False, help="use angular margin loss")
 parser.add_argument("--angular_margin", type=float, default=0.5, help="angular margin")
 parser.add_argument("--inverse_temp", type=float, default=30.0, help="inverse temperature")
 
+parser.add_argument("--infer_method_name", type=lambda b: bool(strtobool(b)), default=True, help="infer method name like code2vec task")
+parser.add_argument("--infer_variable_name", type=lambda b: bool(strtobool(b)), default=False, help="infer variable name like context2name task")
 
 args = parser.parse_args()
 
@@ -112,7 +116,8 @@ def train():
     """train the model"""
     torch.manual_seed(args.random_seed)
 
-    reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path)
+    reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path,
+                           infer_method=args.infer_method_name, infer_variable=args.infer_variable_name)
     option = Option(reader)
 
     builder = DatasetBuilder(reader, option)
@@ -332,8 +337,8 @@ def subtoken_match(expected_labels, actual_labels, label_vocab):
     subtokens_expected_count = 0.0
     subtokens_actual_count = 0.0
     for expected, actual in zip(expected_labels.tolist(), actual_labels.tolist()):
-        exp_subtokens = label_vocab.itosubtokens[expected]
-        actual_subtokens = label_vocab.itosubtokens[actual]
+        exp_subtokens = label_vocab.itosubtokens[expected.item()]
+        actual_subtokens = label_vocab.itosubtokens[actual.item()]
         for subtoken in exp_subtokens:
             if subtoken in actual_subtokens:
                 subtokens_match += 1
@@ -421,7 +426,7 @@ def find_optimal_hyperparams():
     """find optimal hyperparameters"""
     torch.manual_seed(args.random_seed)
 
-    reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path)
+    reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path, infer_method=args.infer_method_name, infer_variable=args.infer_variable_name)
     option = Option(reader)
 
     builder = DatasetBuilder(reader, option)
