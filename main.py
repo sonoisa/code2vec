@@ -21,7 +21,8 @@ from torch.utils.data import DataLoader
 
 from model.model import *
 from model.dataset_builder import *
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 sys.path.append('.')
 
@@ -285,7 +286,7 @@ def test(model, data_loader, criterion, option, label_vocab):
         actual_labels = np.array(actual_labels)
         accuracy, precision, recall, f1 = None, None, None, None
         if args.eval_method == 'exact':
-            accuracy ,precision, recall, f1 = exact_match(expected_labels, actual_labels)
+            accuracy, precision, recall, f1 = exact_match(expected_labels, actual_labels)
         elif args.eval_method == 'subtoken':
             accuracy, precision, recall, f1 = subtoken_match(expected_labels, actual_labels, label_vocab)
         elif args.eval_method == 'ave_subtoken':
@@ -294,9 +295,9 @@ def test(model, data_loader, criterion, option, label_vocab):
 
 
 def exact_match(expected_labels, actual_labels):
-    precision = precision_score(expected_labels, actual_labels, average='weighted')
-    recall = recall_score(expected_labels, actual_labels, average='weighted')
-    f1 = f1_score(expected_labels, actual_labels, average='weighted')
+    expected_labels = np.array(expected_labels, dtype=np.uint64)
+    actual_labels = np.array(actual_labels, dtype=np.uint64)
+    precision, recall, f1, _ = precision_recall_fscore_support(expected_labels, actual_labels, average='weighted')
     accuracy = accuracy_score(expected_labels, actual_labels)
     return accuracy, precision, recall, f1
 
