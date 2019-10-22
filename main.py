@@ -76,6 +76,7 @@ parser.add_argument("--inverse_temp", type=float, default=30.0, help="inverse te
 
 parser.add_argument("--infer_method_name", type=lambda b: bool(strtobool(b)), default=True, help="infer method name like code2vec task")
 parser.add_argument("--infer_variable_name", type=lambda b: bool(strtobool(b)), default=False, help="infer variable name like context2name task")
+parser.add_argument("--shuffle_variable_indexes", type=lambda b: bool(strtobool(b)), default=False, help="shuffle variable indexes in the variable name inference task")
 
 args = parser.parse_args()
 
@@ -118,7 +119,8 @@ def train():
     torch.manual_seed(args.random_seed)
 
     reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path,
-                           infer_method=args.infer_method_name, infer_variable=args.infer_variable_name)
+                           infer_method=args.infer_method_name, infer_variable=args.infer_variable_name,
+                           shuffle_variable_indexes=args.shuffle_variable_indexes)
     option = Option(reader)
 
     builder = DatasetBuilder(reader, option)
@@ -427,7 +429,9 @@ def find_optimal_hyperparams():
     """find optimal hyperparameters"""
     torch.manual_seed(args.random_seed)
 
-    reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path, infer_method=args.infer_method_name, infer_variable=args.infer_variable_name)
+    reader = DatasetReader(args.corpus_path, args.path_idx_path, args.terminal_idx_path,
+                           infer_method=args.infer_method_name, infer_variable=args.infer_variable_name,
+                           shuffle_variable_indexes=args.shuffle_variable_indexes)
     option = Option(reader)
 
     builder = DatasetBuilder(reader, option)

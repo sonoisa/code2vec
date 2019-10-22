@@ -11,6 +11,7 @@ logger = logging.getLogger()
 QUESTION_TOKEN_INDEX = 1
 QUESTION_TOKEN_NAME = "@question"
 
+
 class VocabReader(object):
     """read vocabulary file"""
 
@@ -43,13 +44,18 @@ class VocabReader(object):
 class DatasetReader(object):
     """read dataset file"""
 
-    def __init__(self, corpus_path, path_index_path, terminal_index_path, infer_method, infer_variable):
+    def __init__(self, corpus_path, path_index_path, terminal_index_path, infer_method, infer_variable, shuffle_variable_indexes):
         self.path_vocab = VocabReader(path_index_path).read()
         logger.info('path vocab size: {0}'.format(self.path_vocab.len()))
 
         self.terminal_vocab = VocabReader(terminal_index_path, extra_tokens=[QUESTION_TOKEN_NAME]).read()
         logger.info('terminal vocab size: {0}'.format(self.terminal_vocab.len()))
 
+        terminal_vocab_stoi = self.terminal_vocab.stoi
+        self.variable_indexes = [terminal_vocab_stoi[term] for term in terminal_vocab_stoi if term.startswith("@var_")]
+        logger.info('variable index size: {0}'.format(len(self.variable_indexes)))
+
+        self.shuffle_variable_indexes = shuffle_variable_indexes
         self.QUESTION_TOKEN_NAME = QUESTION_TOKEN_NAME
         self.QUESTION_TOKEN_INDEX = QUESTION_TOKEN_INDEX
         self.infer_method = infer_method

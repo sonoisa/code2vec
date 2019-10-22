@@ -100,9 +100,17 @@ class DatasetBuilder(object):
 
         if self.reader.infer_variable:
             # replace @var_XX with @question
+            variable_indexes = self.reader.variable_indexes
+            new_variable_indexes = [*variable_indexes]
+            new_var_dict = {k: v for k, v in zip(variable_indexes, new_variable_indexes)}
+
             for item in items:
                 alias_names = self._filter_variable_aliases(item.aliases)
                 alias_indexes = [reader.terminal_vocab.stoi[alias_name] for alias_name in alias_names]
+
+                if self.reader.shuffle_variable_indexes:
+                    random.shuffle(new_variable_indexes)
+                    new_var_dict = {k: v for k, v in zip(variable_indexes, new_variable_indexes)}
 
                 # filter on path-contexts related to variables of interest
                 var_path_contexts = [pc for pc in item.path_contexts
@@ -123,12 +131,16 @@ class DatasetBuilder(object):
                                              if pc[0] == var_token_index or pc[2] == var_token_index]:
                         if start == var_token_index:
                             start = question_token_index
+                        else:
+                            start = new_var_dict.get(start, start)
                         starts.append(start)
 
                         paths.append(path)
 
                         if end == var_token_index:
                             end = question_token_index
+                        else:
+                            end = new_var_dict.get(end, end)
                         ends.append(end)
                     starts = starts[:max_path_length]
                     paths = paths[:max_path_length]
