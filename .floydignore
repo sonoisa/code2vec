@@ -12,6 +12,8 @@ var
 *.pyc
 *.swp
 .DS_Store
+__pycache__
+venv
 
 .gitattributes
 .gitignore
