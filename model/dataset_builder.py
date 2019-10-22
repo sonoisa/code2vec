@@ -23,12 +23,31 @@ class DatasetBuilder(object):
         test_count = int(len(reader.items) * split_ratio)
         random.shuffle(reader.items)
         train_items = reader.items[test_count:]
-        test_items = reader.items[0: test_count]
-        logger.info('train dataset size: {0}'.format(len(train_items)))
-        logger.info('test dataset size: {0}'.format(len(test_items)))
+        test_items = reader.items[0:test_count]
+        logger.info('train item size: {0}'.format(len(train_items)))
+        logger.info('test item size: {0}'.format(len(test_items)))
+
+        train_dataset_size = 0
+        test_dataset_size = 0
+        if self.reader.infer_method:
+            train_dataset_size += len(train_items)
+            test_dataset_size += len(test_items)
+        if self.reader.infer_variable:
+            for item in train_items:
+                train_dataset_size += len(self._filter_variable_aliases(item.aliases))
+            for item in test_items:
+                test_dataset_size += len(self._filter_variable_aliases(item.aliases))
+
+        logger.info('train dataset size: {0}'.format(train_dataset_size))
+        logger.info('test dataset size: {0}'.format(test_dataset_size))
 
         self.train_items = train_items
         self.test_items = test_items
+        self.train_dataset = None
+        self.test_dataset = None
+
+    def _filter_variable_aliases(self, aliases):
+        return [alias_name for alias_name in aliases if alias_name.startswith("@var_")]
 
     def refresh_train_dataset(self):
         """refresh training dataset (shuffling path contexts and picking up items (#items <= max_path_length)"""
@@ -82,11 +101,15 @@ class DatasetBuilder(object):
         if self.reader.infer_variable:
             # replace @var_XX with @question
             for item in items:
+                alias_names = self._filter_variable_aliases(item.aliases)
+                alias_indexes = [reader.terminal_vocab.stoi[alias_name] for alias_name in alias_names]
 
-                for alias_name in item.aliases:
-                    if not alias_name.startswith("@var_"):
-                        continue
-                    var_token_index = reader.terminal_vocab.stoi[alias_name]
+                # filter on path-contexts related to variables of interest
+                var_path_contexts = [pc for pc in item.path_contexts
+                                     if pc[0] in alias_indexes or pc[2] in alias_indexes]
+                random.shuffle(var_path_contexts)
+
+                for alias_name, var_token_index in zip(alias_names, alias_indexes):
                     normalized_var_name = item.aliases[alias_name]
                     label_index = label_vocab_stoi[normalized_var_name]
 
@@ -96,8 +119,8 @@ class DatasetBuilder(object):
                     paths = []
                     ends = []
 
-                    random.shuffle(item.path_contexts)
-                    for start, path, end in item.path_contexts[:max_path_length]:
+                    for start, path, end in [pc for pc in var_path_contexts
+                                             if pc[0] == var_token_index or pc[2] == var_token_index]:
                         if start == var_token_index:
                             start = question_token_index
                         starts.append(start)
@@ -107,6 +130,9 @@ class DatasetBuilder(object):
                         if end == var_token_index:
                             end = question_token_index
                         ends.append(end)
+                    starts = starts[:max_path_length]
+                    paths = paths[:max_path_length]
+                    ends = ends[:max_path_length]
                     starts = self.pad_inputs(starts, max_path_length)
                     paths = self.pad_inputs(paths, max_path_length)
                     ends = self.pad_inputs(ends, max_path_length)
