@@ -46,6 +46,8 @@ class DatasetBuilder(object):
         self.train_dataset = None
         self.test_dataset = None
 
+        logger.info('OOV rate: {0}'.format(self._out_of_vocabulary_rate(option, reader, train_items, test_items)))
+
     def _filter_variable_aliases(self, aliases):
         return [alias_name for alias_name in aliases if alias_name.startswith("@var_")]
 
@@ -59,6 +61,54 @@ class DatasetBuilder(object):
         inputs_id, inputs_starts, inputs_paths, inputs_ends, inputs_label = self.build_data(self.reader, self.test_items, self.option.max_path_length)
         self.test_dataset = CodeDataset(inputs_id, inputs_starts, inputs_paths, inputs_ends, inputs_label)
 
+    def _get_labels(self, option, reader, normalized_label):
+        if option.eval_method == 'exact':
+            return [normalized_label]
+        else:
+            label_index = reader.label_vocab.stoi[normalized_label]
+            subtokens = reader.label_vocab.itosubtokens[label_index]
+            return subtokens
+
+    def _out_of_vocabulary_rate(self, option, reader, train_items, test_items):
+        train_vocab = set()
+
+        tokens_match = 0
+        tokens_count = 0
+        if self.reader.infer_method:
+            for item in train_items:
+                tokens = self._get_labels(option, reader, item.normalized_label)
+                for token in tokens:
+                    train_vocab.add(token)
+
+        if self.reader.infer_variable:
+            for item in train_items:
+                alias_names = self._filter_variable_aliases(item.aliases)
+                alias_indexes = [reader.terminal_vocab.stoi[alias_name] for alias_name in alias_names]
+
+                for alias_name, var_token_index in zip(alias_names, alias_indexes):
+                    normalized_var_name = item.aliases[alias_name]
+                    tokens = self._get_labels(option, reader, normalized_var_name)
+                    for token in tokens:
+                        train_vocab.add(token)
+
+        if self.reader.infer_method:
+            for item in test_items:
+                tokens = self._get_labels(option, reader, item.normalized_label)
+                tokens_match += len([token for token in tokens if token in train_vocab])
+                tokens_count += len(tokens)
+
+        if self.reader.infer_variable:
+            for item in test_items:
+                alias_names = self._filter_variable_aliases(item.aliases)
+                alias_indexes = [reader.terminal_vocab.stoi[alias_name] for alias_name in alias_names]
+
+                for alias_name, var_token_index in zip(alias_names, alias_indexes):
+                    normalized_var_name = item.aliases[alias_name]
+                    tokens = self._get_labels(option, reader, normalized_var_name)
+                    tokens_match += len([token for token in tokens if token in train_vocab])
+                    tokens_count += len(tokens)
+        return 1.0 - tokens_match / tokens_count
+
     def build_data(self, reader, items, max_path_length):
         inputs_id = []
         inputs_starts = []
@@ -66,11 +116,12 @@ class DatasetBuilder(object):
         inputs_ends = []
         inputs_label = []
         label_vocab_stoi = reader.label_vocab.stoi
+        terminal_vocab_stoi = reader.terminal_vocab.stoi
         question_token_index = reader.QUESTION_TOKEN_INDEX
 
         if self.reader.infer_method:
             # replace @method_0 with @question
-            method_token_index = reader.terminal_vocab.stoi["@method_0"]
+            method_token_index = terminal_vocab_stoi["@method_0"]
 
             for item in items:
                 inputs_id.append(item.id)
@@ -106,7 +157,7 @@ class DatasetBuilder(object):
 
             for item in items:
                 alias_names = self._filter_variable_aliases(item.aliases)
-                alias_indexes = [reader.terminal_vocab.stoi[alias_name] for alias_name in alias_names]
+                alias_indexes = [terminal_vocab_stoi[alias_name] for alias_name in alias_names]
 
                 if self.reader.shuffle_variable_indexes:
                     random.shuffle(new_variable_indexes)

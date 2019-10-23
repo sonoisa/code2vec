@@ -106,6 +106,7 @@ class Option(object):
 
         self.dropout_prob = args.dropout_prob
         self.batch_size = args.batch_size
+        self.eval_method = args.eval_method
 
         self.angular_margin_loss = args.angular_margin_loss
         self.angular_margin = args.angular_margin
