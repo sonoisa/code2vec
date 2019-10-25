@@ -4,7 +4,7 @@ an implementation of "[code2vec: Learning Distributed Representations of Code](h
 
 # Requirements
 * python 3.6+
-* pytorch 0.4.1+
+* pytorch 1.1+
 * scikit-learn
 * tensorboardX (optional)
 
